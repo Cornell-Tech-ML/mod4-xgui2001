@@ -85,8 +85,8 @@ def _tensor_conv1d(
         and in_channels == in_channels_
         and out_channels == out_channels_
     )
-    #s1 = input_strides
-    #s2 = weight_strides
+    # s1 = input_strides
+    # s2 = weight_strides
 
     # 4.1
     # Iterate over batches, output channels, and output width
@@ -246,11 +246,11 @@ def _tensor_conv2d(
         and out_channels == out_channels_
     )
 
-    #s1 = input_strides
-    #s2 = weight_strides
+    # s1 = input_strides
+    # s2 = weight_strides
     # inners
-    #s10, s11, s12, s13 = s1[0], s1[1], s1[2], s1[3]
-    #s20, s21, s22, s23 = s2[0], s2[1], s2[2], s2[3]
+    # s10, s11, s12, s13 = s1[0], s1[1], s1[2], s1[3]
+    # s20, s21, s22, s23 = s2[0], s2[1], s2[2], s2[3]
 
     # 4.2
 

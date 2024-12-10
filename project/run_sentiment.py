@@ -89,7 +89,7 @@ class CNNSentimentKim(minitorch.Module):
 
         linear = self.linear.forward(dropout)
         output = linear.sigmoid().view(embeddings.shape[0], 1)
-        
+
         return output
 
 
