@@ -61,15 +61,36 @@ class CNNSentimentKim(minitorch.Module):
     ):
         super().__init__()
         self.feature_map_size = feature_map_size
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        self.dropout = dropout
+
+        self.conv1 = Conv1d(embedding_size, feature_map_size, filter_sizes[0])
+        self.conv2 = Conv1d(embedding_size, feature_map_size, filter_sizes[1])
+        self.conv3 = Conv1d(embedding_size, feature_map_size, filter_sizes[2])
+
+        self.linear = Linear(feature_map_size, 1)
+        self.dropout = dropout
 
     def forward(self, embeddings):
         """
         embeddings tensor: [batch x sentence length x embedding dim]
         """
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        embeddings = embeddings.permute(0, 2, 1)
+        conv1 = self.conv1(embeddings).relu()
+        conv2 = self.conv2(embeddings).relu()
+        conv3 = self.conv3(embeddings).relu()
+
+        pooled1 = self.pool(conv1)
+        pooled2 = self.pool(conv2)
+        pooled3 = self.pool(conv3)
+
+        combined = minitorch.cat((pooled1, pooled2, pooled3), dim=1)
+        combined = combined.view(combined.shape[0], self.feature_map_size)
+        dropout = minitorch.dropout(combined, self.dropout, ignore = not self.training)
+
+        linear = self.linear.forward(dropout)
+        output = linear.sigmoid().view(embeddings.shape[0], 1)
+        
+        return output
 
 
 # Evaluation helper methods
