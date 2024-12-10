@@ -68,35 +68,42 @@ def avgpool2d(input: Tensor, kernel: Tuple[int, int]) -> Tensor:
 class Max(Function):
     @staticmethod
     def forward(ctx: Context, t1: Tensor, dim: Tensor) -> Tensor:
+        """Compute the forward pass for a max reduction."""
         ctx.save_for_backward(t1, dim)
         return t1.f.max_reduce(t1, int(dim.item()))
 
     @staticmethod
     def backward(ctx: Context, grad_output: Tensor) -> tuple[Tensor, float]:
+        """Compute the backward pass for a max reduction."""
         t1, dim = ctx.saved_values
         return grad_output * argmax(t1, dim), 0.0
 
 
 def max(a: Tensor, dim: int) -> Tensor:
+    """Compute the max reduction."""
     return Max.apply(a, a._ensure_tensor(dim))
 
 
 def argmax(a: Tensor, dim: int) -> Tensor:
+    """Compute the argmax reduction."""
     max_val = max(a, dim)
     return a == max_val
 
 
 def softmax(a: Tensor, dim: int) -> Tensor:
+    """Compute the softmax reduction."""
     max_val = max(a, dim)
     exp_val = (a - max_val).exp()
     return exp_val / exp_val.sum(dim)
 
 
 def logsoftmax(a: Tensor, dim: int) -> Tensor:
+    """Compute the log softmax reduction."""
     return (softmax(a, dim) + 1e-10).log()
 
 
 def maxpool2d(input: Tensor, kernel: Tuple[int, int]) -> Tensor:
+    """Compute a 2D max pool to an image tensor."""
     reshaped, new_height, new_width = tile(input, kernel)
     return max(reshaped, dim=4).view(
         input.shape[0], input.shape[1], new_height, new_width
@@ -104,6 +111,7 @@ def maxpool2d(input: Tensor, kernel: Tuple[int, int]) -> Tensor:
 
 
 def dropout(input: Tensor, rate: float, ignore: bool = False) -> Tensor:
+    """Compute a dropout reduction."""
     if ignore:
         return input
     mask = rand(input.shape) > rate
