@@ -1,4 +1,5 @@
 import random
+from pathlib import Path
 
 import embeddings
 
@@ -34,8 +35,8 @@ class Conv1d(minitorch.Module):
         self.bias = RParam(1, out_channels, 1)
 
     def forward(self, input):
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        conv = minitorch.conv1d(input, self.weights.value)
+        return conv + self.bias.value
 
 
 class CNNSentimentKim(minitorch.Module):
@@ -61,13 +62,13 @@ class CNNSentimentKim(minitorch.Module):
     ):
         super().__init__()
         self.feature_map_size = feature_map_size
-        self.dropout = dropout
 
         self.conv1 = Conv1d(embedding_size, feature_map_size, filter_sizes[0])
         self.conv2 = Conv1d(embedding_size, feature_map_size, filter_sizes[1])
         self.conv3 = Conv1d(embedding_size, feature_map_size, filter_sizes[2])
 
         self.linear = Linear(feature_map_size, 1)
+        self.pool = lambda x: minitorch.max(x, dim=2)
         self.dropout = dropout
 
     def forward(self, embeddings):
@@ -79,14 +80,15 @@ class CNNSentimentKim(minitorch.Module):
         conv2 = self.conv2(embeddings).relu()
         conv3 = self.conv3(embeddings).relu()
 
+        # Global max pooling over time
         pooled1 = self.pool(conv1)
         pooled2 = self.pool(conv2)
         pooled3 = self.pool(conv3)
 
-        combined = minitorch.cat((pooled1, pooled2, pooled3), dim=1)
+        combined = pooled1 + pooled2 + pooled3
         combined = combined.view(combined.shape[0], self.feature_map_size)
-        dropout = minitorch.dropout(combined, self.dropout, ignore = not self.training)
 
+        dropout = minitorch.nn.dropout(combined, self.dropout, ignore=not self.training)
         linear = self.linear.forward(dropout)
         output = linear.sigmoid().view(embeddings.shape[0], 1)
 
@@ -173,12 +175,11 @@ class SentenceSentimentTrain:
                 )
                 x.requires_grad_(True)
                 y.requires_grad_(True)
-                # Forward
+
                 out = model.forward(x)
                 prob = (out * y) + (out - 1.0) * (y - 1.0)
                 loss = -(prob.log() / y.shape[0]).sum()
                 loss.view(1).backward()
-
                 # Save train predictions
                 train_predictions += get_predictions_array(y, out)
                 total_loss += loss[0]
@@ -273,18 +274,81 @@ def encode_sentiment_data(dataset, pretrained_embeddings, N_train, N_val=0):
     return (X_train, y_train), (X_val, y_val)
 
 
+def load_glove_embeddings(path="data/glove.6B.50d.txt"):
+    """Load GloVe embeddings from local file.
+
+    Args:
+    ----
+        path: Path to the GloVe embeddings file
+
+    Returns:
+    -------
+        dict: Word to embedding mapping
+    """
+    word2emb = {}
+    with open(path, 'r', encoding='utf-8') as f:
+        for line in f:
+            values = line.split()
+            word = values[0]
+            vector = [float(x) for x in values[1:]]
+            word2emb[word] = vector
+    return word2emb
+
+
+class GloveEmbedding:
+    """Simple wrapper class to mimic the original GloveEmbedding interface."""
+
+    def __init__(self, word2emb):
+        self.word2emb = word2emb
+        # Get embedding dimension from first entry
+        self.d_emb = len(next(iter(word2emb.values())))
+
+    def emb(self, word, default=None):
+        """Get embedding for a word.
+
+        Args:
+        ----
+            word: Word to get embedding for
+            default: Default value if word not found
+
+        Returns:
+        -------
+            list: Embedding vector
+        """
+        return self.word2emb.get(word, default)
+
+    def __contains__(self, word):
+        """Support for 'in' operator.
+
+        Args:
+        ----
+            word: Word to check
+
+        Returns:
+        -------
+            bool: True if word is in embeddings
+        """
+        return word in self.word2emb
+
+
 if __name__ == "__main__":
     train_size = 450
     validation_size = 100
     learning_rate = 0.01
     max_epochs = 250
 
+    # Load embeddings
+    word2emb = load_glove_embeddings()
+    embeddings = GloveEmbedding(word2emb)
+
+    # Use the embeddings in encode_sentiment_data
     (X_train, y_train), (X_val, y_val) = encode_sentiment_data(
         load_dataset("glue", "sst2"),
-        embeddings.GloveEmbedding("wikipedia_gigaword", d_emb=50, show_progress=True),
+        embeddings,
         train_size,
         validation_size,
     )
+
     model_trainer = SentenceSentimentTrain(
         CNNSentimentKim(feature_map_size=100, filter_sizes=[3, 4, 5], dropout=0.25)
     )
@@ -294,3 +358,4 @@ if __name__ == "__main__":
         max_epochs=max_epochs,
         data_val=(X_val, y_val),
     )
+

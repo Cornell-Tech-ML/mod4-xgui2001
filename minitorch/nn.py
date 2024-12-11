@@ -99,15 +99,18 @@ def softmax(a: Tensor, dim: int) -> Tensor:
 
 def logsoftmax(a: Tensor, dim: int) -> Tensor:
     """Compute the log softmax reduction."""
-    return (softmax(a, dim) + 1e-10).log()
+    max_val = max(a, dim)
+    shifted = a - max_val
+    exp_val = shifted.exp()
+    sum_exp = exp_val.sum(dim)
+    return shifted - sum_exp.log()
 
 
 def maxpool2d(input: Tensor, kernel: Tuple[int, int]) -> Tensor:
     """Compute a 2D max pool to an image tensor."""
     reshaped, new_height, new_width = tile(input, kernel)
-    return max(reshaped, dim=4).view(
-        input.shape[0], input.shape[1], new_height, new_width
-    )
+    pool = max(reshaped, dim=4)
+    return pool.view(input.shape[0], input.shape[1], new_height, new_width)
 
 
 def dropout(input: Tensor, rate: float, ignore: bool = False) -> Tensor:

@@ -1,8 +1,12 @@
 from mnist import MNIST
 
+import os
+print("Current working directory:", os.getcwd())
+print("Files in data directory:", os.listdir('./data'))
+
 import minitorch
 
-mndata = MNIST("project/data/")
+mndata = MNIST("data/")
 images, labels = mndata.load_training()
 
 BACKEND = minitorch.TensorBackend(minitorch.FastOps)
@@ -41,8 +45,7 @@ class Conv2d(minitorch.Module):
         self.bias = RParam(out_channels, 1, 1)
 
     def forward(self, input):
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        return minitorch.conv2d(input, self.weights.value) + self.bias.value
 
 
 class Network(minitorch.Module):
@@ -67,12 +70,27 @@ class Network(minitorch.Module):
         self.mid = None
         self.out = None
 
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        self.conv1 = Conv2d(1, 4, 3, 3)
+        self.conv2 = Conv2d(4, 8, 3, 3)
+
+        # 8 channels * 7 * 7 after convolutions and pooling = 392
+        self.fc1 = Linear(392, 64)
+        self.fc2 = Linear(64, C)
+
+        self.dropout_rate = 0.25
 
     def forward(self, x):
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        self.mid = self.conv1(x).relu()
+        self.out = self.conv2(self.mid).relu()
+
+        out = minitorch.maxpool2d(self.out, [4, 4])
+        out = out.view(BATCH, 392)
+
+        out = self.fc1(out).relu()
+        out = minitorch.dropout(out, self.dropout_rate, ignore=not self.training)
+        out = self.fc2(out)
+
+        return minitorch.logsoftmax(out, dim=1)
 
 
 def make_mnist(start, stop):
@@ -155,9 +173,9 @@ class ImageTrain:
                         )
                         out = model.forward(x.view(BATCH, 1, H, W)).view(BATCH, C)
                         for i in range(BATCH):
-                            m = -1000
-                            ind = -1
-                            for j in range(C):
+                            m = out[i, 0]  # Initialize with first class value
+                            ind = 0       # Initialize with first class index
+                            for j in range(1, C):  # Start from second class
                                 if out[i, j] > m:
                                     ind = j
                                     m = out[i, j]
@@ -171,4 +189,4 @@ class ImageTrain:
 
 if __name__ == "__main__":
     data_train, data_val = (make_mnist(0, 5000), make_mnist(10000, 10500))
-    ImageTrain().train(data_train, data_val, learning_rate=0.01)
+    ImageTrain().train(data_train, data_val, learning_rate=5e-3)
